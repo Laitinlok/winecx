@@ -167,6 +167,9 @@ static CertificateChainEngine *get_chain_engine(HCERTCHAINENGINE handle, BOOL al
         if(!allow_default)
             return NULL;
 
+        if (is_bnet())
+            return CRYPT_CreateChainEngine(NULL, CERT_SYSTEM_STORE_CURRENT_USER, &config);
+
         if(!default_cu_engine) {
             handle = CRYPT_CreateChainEngine(NULL, CERT_SYSTEM_STORE_CURRENT_USER, &config);
             InterlockedCompareExchangePointer((void**)&default_cu_engine, handle, NULL);
@@ -180,6 +183,9 @@ static CertificateChainEngine *get_chain_engine(HCERTCHAINENGINE handle, BOOL al
     if(handle == HCCE_LOCAL_MACHINE) {
         if(!allow_default)
             return NULL;
+
+        if (is_bnet())
+            return CRYPT_CreateChainEngine(NULL, CERT_SYSTEM_STORE_LOCAL_MACHINE, &config);
 
         if(!default_lm_engine) {
             handle = CRYPT_CreateChainEngine(NULL, CERT_SYSTEM_STORE_LOCAL_MACHINE, &config);
@@ -2894,11 +2900,17 @@ BOOL WINAPI CertGetCertificateChain(HCERTCHAINENGINE hChainEngine,
         *ppChainContext = NULL;
     if (!pChainPara)
     {
+        if (is_bnet() && (hChainEngine == HCCE_CURRENT_USER || hChainEngine == HCCE_LOCAL_MACHINE))
+            free_chain_engine(engine);
+
         SetLastError(E_INVALIDARG);
         return FALSE;
     }
     if (!pCertContext->pCertInfo->SignatureAlgorithm.pszObjId)
     {
+        if (is_bnet() && (hChainEngine == HCCE_CURRENT_USER || hChainEngine == HCCE_LOCAL_MACHINE))
+            free_chain_engine(engine);
+
         SetLastError(ERROR_INVALID_DATA);
         return FALSE;
     }
@@ -2938,6 +2950,8 @@ BOOL WINAPI CertGetCertificateChain(HCERTCHAINENGINE hChainEngine,
         else
             CertFreeCertificateChain(pChain);
     }
+    if (is_bnet() && (hChainEngine == HCCE_CURRENT_USER || hChainEngine == HCCE_LOCAL_MACHINE))
+        free_chain_engine(engine);
     TRACE("returning %d\n", ret);
     return ret;
 }
